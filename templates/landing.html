@@ -147,6 +147,7 @@
                             <div class="flex items-center gap-2">
                                 <a id="videoOpenDirectLink" target="_blank" rel="noopener noreferrer" referrerpolicy="no-referrer" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-indigo-300 hover:text-brand transition shadow-sm" title="在新窗口中打开当前视频">{{ icon('link', 'w-3.5 h-3.5') }}新窗口打开</a>
                                 <button type="button" onclick="copyCurrentVideoUrl()" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-indigo-300 hover:text-brand transition shadow-sm" title="复制当前视频直链">{{ icon('clipboard', 'w-3.5 h-3.5') }}复制直链</button>
+                                <button type="button" onclick="downloadCurrentVideo()" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-indigo-300 hover:text-brand transition shadow-sm" title="下载当前视频到本地，保存文件名为解析标题">{{ icon('download', 'w-3.5 h-3.5') }}下载视频</button>
                                 <button id="previousVideoBtn" type="button" onclick="stepVideo(-1)" class="hidden rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-indigo-300 hover:text-brand disabled:cursor-not-allowed disabled:opacity-40 transition">← 上一个</button>
                                 <button id="nextVideoBtn" type="button" onclick="stepVideo(1)" class="hidden rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-indigo-300 hover:text-brand disabled:cursor-not-allowed disabled:opacity-40 transition">下一个 →</button>
                             </div>
@@ -187,7 +188,10 @@
 
                     <!-- 背景音频播放栏 -->
                     <div id="audioContainer" class="hidden scroll-mt-24">
-                        <h4 class="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">{{ icon('music', 'w-4 h-4 text-slate-500') }} 背景音频</h4>
+                        <div class="mb-2 flex flex-wrap items-center justify-between gap-3">
+                            <h4 class="text-sm font-semibold text-slate-900 flex items-center gap-2">{{ icon('music', 'w-4 h-4 text-slate-500') }} 背景音频</h4>
+                            <button type="button" onclick="downloadCurrentAudio()" class="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 hover:border-indigo-300 hover:text-brand transition shadow-sm" title="下载当前音频到本地，保存文件名为解析标题">{{ icon('download', 'w-3.5 h-3.5') }}下载音频</button>
+                        </div>
                         <audio id="audioPlayer" controls referrerpolicy="no-referrer" class="w-full rounded-xl"></audio>
                         <p id="audioPreviewNotice" class="hidden mt-3 rounded-xl border border-slate-200/80 bg-slate-50/80 px-3.5 py-2.5 text-xs leading-relaxed text-slate-600"></p>
                     </div>
@@ -586,6 +590,33 @@
         function copyCurrentVideoUrl(){
             const url = currentVideoUrls[activeVideoIndex];
             if(url) copyText(url, '已复制当前视频链接');
+        }
+
+        // 统一跳转下载代理，保存文件名取自解析标题并清理文件系统非法字符；扩展名由服务端按 Content-Type 推断
+        function triggerMediaDownload(url, fallbackName, startMsg){
+            const rawTitle = (document.getElementById('resultTitle').textContent || '').trim();
+            const safeTitle = rawTitle.replace(/[\\/:*?"<>|\x00-\x1f]+/g, ' ').trim().slice(0, 100) || fallbackName;
+            const params = new URLSearchParams({ url, filename: safeTitle });
+            showToast(startMsg, 'success', 2000);
+            window.location.href = `{{ url_for('web.download_video') }}?${params.toString()}`;
+        }
+
+        function downloadCurrentVideo(){
+            const url = currentVideoUrls[activeVideoIndex];
+            if(!url){
+                showToast('当前没有可下载的视频', 'warning');
+                return;
+            }
+            triggerMediaDownload(url, '视频', '已开始下载视频文件');
+        }
+
+        function downloadCurrentAudio(){
+            const url = lastParsedData && lastParsedData.audio_url;
+            if(!url){
+                showToast('当前没有可下载的音频', 'warning');
+                return;
+            }
+            triggerMediaDownload(url, '音频', '已开始下载音频文件');
         }
 
         function showVideoFallback(selectedUrl){
